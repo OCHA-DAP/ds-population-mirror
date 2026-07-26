@@ -19,6 +19,13 @@ one re-deriving population ad hoc.
   serves them. Consumers reconcile to the COD vintage via the crosswalk
   pattern in KB `methods/pcode-matching.md` (e.g. `normalize_pcodes()` /
   `REFORM_XWALK` in ds-seas5-skill's `pipeline/export_hnrp_drought.py`).
+- Known upstream data-quality bug (2026-07): **PAK adm1 rows are mis-p-coded
+  by HAPI** — 5 rows with a duplicate PK7 and populations shifted one unit
+  against their names/codes (PK2 "Balochistan" carries KP's 35.5M, PK5 "KP"
+  carries Islamabad's 2.0M; verified vs the 2017 census; resource
+  16394872-79a8-4292-bc7c-037bb7038084). Mirrored raw per doctrine —
+  consumers must distrust PAK adm1 (seas5-skill excludes it explicitly).
+  Worth reporting to the HDX HAPI team.
 - Known coverage holes (2026-07): **YEM absent entirely** from HAPI baseline
   population — the brief's Phase 2 (WorldPop zonal stats over our COD
   polygons in the prod `polygon` blob container) is the designed fallback.
