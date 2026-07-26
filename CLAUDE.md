@@ -26,6 +26,8 @@ one re-deriving population ad hoc.
   16394872-79a8-4292-bc7c-037bb7038084). Mirrored raw per doctrine —
   consumers must distrust PAK adm1 (seas5-skill excludes it explicitly).
   Worth reporting to the HDX HAPI team.
+- **NAM adm1 rows are ~10% of reality** (sum 284k vs 3.0M census 2023) — the
+  true figures sit in its adm2 (constituency) rows; aggregate those instead.
 - Known coverage holes (2026-07): **YEM absent entirely** from HAPI baseline
   population — the brief's Phase 2 (WorldPop zonal stats over our COD
   polygons in the prod `polygon` blob container) is the designed fallback.
