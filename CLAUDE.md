@@ -29,9 +29,17 @@ one re-deriving population ad hoc.
 - **NAM adm1 rows are ~10% of reality** (sum 284k vs 3.0M census 2023) — the
   true figures sit in its adm2 (constituency) rows; aggregate those instead.
 - Known coverage holes (2026-07): **YEM absent entirely** from HAPI baseline
-  population — the brief's Phase 2 (WorldPop zonal stats over our COD
-  polygons in the prod `polygon` blob container) is the designed fallback.
-  Run `scripts/pcode_audit.py` for the current gap list vs `public.polygon`.
+  population; ~20 `public.polygon` countries missing overall (SYR, MMR, UKR,
+  LBN…). Run `scripts/pcode_audit.py` for the current gap list.
+- **Recommended fallback for missing/distrusted countries** (before reaching
+  for WorldPop; the seas5-skill HNRP tab uses this layering): (1) this
+  mirror → (2) **HNO/JIAF baseline in `hpc.needs_admin`** (ds-hnrp-mirror;
+  `population_status='all' AND lower(category) IN ('total','')`) — current
+  planning-year totals for 17 HRP countries incl. YEM/UKR/MMR and the
+  old-census countries → (3) per-country HDX datasets HAPI never ingested
+  (`cod-ps-mmr`/`-ukr`/`-gmb`, OCHA CO estimates for LBN/YEM/LBY) → (4)
+  WorldPop zonal stats, only for the residue (SYR, COG, GNB). Full detail on
+  the KB page.
 - Full-replace loads guard against partial pulls (refuse to shrink >50%).
 - DB access via `ocha_stratus.get_engine(stage=STAGE, write=...)`;
   `PGSSLMODE=require`. STAGE defaults to dev.
