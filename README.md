@@ -24,8 +24,17 @@ uv run --no-sync python scripts/refresh_pop.py   # full-replace load (guarded)
 uv run --no-sync python scripts/pcode_audit.py   # join-rate audit vs public.polygon
 ```
 
-Refreshes monthly via GitHub Actions (`refresh-pop.yml`), also
-`workflow_dispatch`-able.
+Refreshes monthly (3rd, 04:23 UTC) as the Databricks job **Population
+Mirror** (`databricks.yml`): the dev DB is reachable only through its private
+endpoint, so the refresh cannot run on GitHub runners. The Job Compute policy
+injects the `DSCI_AZ_*` secrets; `HAPI_APP_IDENTIFIER` must exist in the
+`dsci` secret scope.
+
+```sh
+databricks bundle validate -t prod -p DEFAULT
+databricks bundle deploy   -t prod -p DEFAULT                 # config changes only; code ships by pushing main
+databricks bundle run population_mirror -t prod -p DEFAULT    # on-demand refresh
+```
 
 ## Attribution
 
