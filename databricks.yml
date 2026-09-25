@@ -1,0 +1,117 @@
+# Databricks Asset Bundle — ds-population-mirror
+#
+# One job, one task (replaces refresh-pop.yml's monthly cron):
+#     refresh_pop     scripts/refresh_pop.py → pop.population_admin (guarded full replace)
+#
+# Every task runs the unchanged pure-Python script through the thin wrapper
+# databricks/run_task.py, which sets STAGE (the ocha-stratus data plane) and
+# copies src/ + scripts/ onto local disk before running. Credentials are not
+# in this file: the Job Compute policy injects DSCI_AZ_* from the `dsci`
+# secret scope.
+#
+# Extra secrets (not in the policy) that must exist in the dsci scope before
+# the first deploy: HAPI_APP_IDENTIFIER.
+#
+# Data plane: this mirror lives on the DEV DB (+ dev blob) by design, so the
+# prod TARGET (= the live schedule, ephemeral Job Compute) still runs with
+# stage=dev. The two axes are independent (KB infrastructure/databricks.md).
+#
+#   databricks bundle validate -t prod -p DEFAULT
+#   databricks bundle deploy   -t prod -p DEFAULT                          # the live job(s)
+#   databricks bundle run population_mirror -t prod -p DEFAULT              # manual run
+#   databricks bundle deploy   -t dev  -p DEFAULT --var git_branch=my-branch   # feature test (paused)
+#   databricks bundle destroy  -t dev  -p DEFAULT
+#
+# Code changes ship by pushing the branch (source: GIT); `bundle deploy` is
+# only needed when the job config (schedule, params, libraries) changes.
+
+bundle:
+  name: ds-population-mirror
+
+variables:
+  git_branch:
+    description: Repo branch the jobs pull the code from
+    default: main
+  stage:
+    description: ocha-stratus data plane the scripts read/write (dev | prod) — this mirror is dev
+    default: dev
+
+.git_source: &git_source
+  git_url: https://github.com/OCHA-DAP/ds-population-mirror.git
+  git_provider: gitHub
+  git_branch: ${var.git_branch}
+
+# Job Compute policy (000C79D951EAF0D6): ephemeral single-worker cluster that
+# injects DSCI_AZ_DB_*/DSCI_AZ_BLOB_* (dev + prod) from the dsci secret scope.
+.cluster_spec: &cluster_spec
+  policy_id: "000C79D951EAF0D6"
+  apply_policy_default_values: true
+  num_workers: 1
+  spark_env_vars:
+    HAPI_APP_IDENTIFIER: "{{secrets/dsci/HAPI_APP_IDENTIFIER}}"
+
+# pyproject [project.dependencies]; pandas/pyarrow/requests come with the runtime.
+.libs: &libs
+  - pypi: { package: "ocha-stratus>=0.1.7" }
+  - pypi: { package: "python-dotenv" }
+  - pypi: { package: "psycopg2-binary" }
+  - pypi: { package: "sqlalchemy>=2.0" }
+
+resources:
+  jobs:
+
+    population_mirror:
+      name: Population Mirror
+      description: >
+        Monthly full-replace mirror of the HDX HAPI baseline population (COD-PS totals, p-coded admin 0-2) into the dev `pop` schema.
+      git_source: *git_source
+      tags:
+        databricks: job
+        output_schema: pop
+
+      permissions:
+        - group_name: dsci
+          level: CAN_MANAGE
+
+      schedule:
+        # 04:23 UTC on the 3rd of each month (the old GitHub Actions cron). No explicit pause_status: the prod target runs it,
+        # the dev target (development mode) auto-pauses it.
+        quartz_cron_expression: "0 23 4 3 * ?"
+        timezone_id: UTC
+
+      max_concurrent_runs: 1
+
+      parameters:
+        - name: stage
+          default: ${var.stage}
+
+      job_clusters:
+        - job_cluster_key: main
+          new_cluster: *cluster_spec
+
+      tasks:
+        - task_key: refresh_pop
+          job_cluster_key: main
+          libraries: *libs
+          spark_python_task:
+            python_file: databricks/run_task.py
+            source: GIT
+            parameters:
+              - "scripts/refresh_pop.py"
+              - "--stage"
+              - "{{job.parameters.stage}}"
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      profile: DEFAULT
+
+  prod:
+    mode: production
+    workspace:
+      profile: DEFAULT
+      root_path: /Workspace/Users/adm.tdowning@global.un.org/.bundle/${bundle.name}/${bundle.target}
+    run_as:
+      user_name: adm.tdowning@global.un.org
