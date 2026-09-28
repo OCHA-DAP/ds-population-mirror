@@ -60,12 +60,13 @@ resources:
 
     population_mirror:
       name: Population Mirror
-      description: >
-        Monthly full-replace mirror of the HDX HAPI baseline population (COD-PS totals, p-coded admin 0-2) into the dev `pop` schema.
+      description: "Mirror baseline population by admin unit from [HAPI](https://hapi.humdata.org/)"
       git_source: *git_source
       tags:
         databricks: job
-        output_schema: pop
+        type: dataset-ingest
+        kb: population-mirror
+        output_schema: pop.population_admin
 
       permissions:
         - group_name: dsci
